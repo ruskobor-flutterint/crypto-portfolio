@@ -1,24 +1,16 @@
 import conf from "./config/config"
 import express from "express"
-import bunyan from "bunyan"
 import UserRouter from "@routes/UserRouter"
 import PortfolioRouter from "@routes/PortfolioRouter"
-import { createContainer } from "awilix"
+import { loggerFactory } from "@utils/utils"
+import { setupDI } from "@utils/DI"
 
-const appLog = bunyan.createLogger({
-  name: "APP",
-})
+// DI setup
+setupDI(conf)
 
+const appLog = loggerFactory("app")
 const app = express()
 const port = conf.port
-
-// DI container
-const container = createContainer({
-  injectionMode: "PROXY",
-  strict: true,
-})
-
-
 
 // Routers setup
 app.use(new UserRouter().getRouter())
@@ -27,3 +19,7 @@ app.use(new PortfolioRouter().getRouter())
 app.listen(port, () => {
   appLog.info(`crypto-porfolio listening on port ${port}`)
 })
+
+// let ks = new KafkaService()
+// ks.connect()
+// ks.sendMessage("test-topic", "Hello KafkaJS user!")

@@ -1,20 +1,24 @@
+import { loggerFactory } from "@utils/utils"
 import { Request, Response, NextFunction } from "express"
-import Logger from "bunyan"
 
-const logger = Logger.createLogger({ name: "HTTP" })
+const logger = loggerFactory("http-log")
 
-function httpLog(req: Request, res: Response, next: NextFunction): void {
+function httpLogMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
   logger.info({
     method: req.method,
     url: req.url,
     body: req.body,
     query: req.query,
     params: req.params,
-    headers: req.headers,
+    // headers: req.headers,
     ip: req.ip,
     time: new Date().toISOString(),
   })
   next()
 }
 
-export { httpLog }
+export { httpLogMiddleware }

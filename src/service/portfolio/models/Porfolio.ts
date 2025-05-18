@@ -6,8 +6,4 @@ interface Portfolio {
 
 type CryptoAsset = { coin: string; amount: number }
 
-const enum Coins {
-  "ETH" = "ethereum",
-}
-
 export default Portfolio

@@ -1,16 +1,9 @@
-import IPriceCollectorService from "@services/updates/IPriceCollectorService"
-import { CollectorService } from "./collector/ICollectorService"
+import ICollectorService from "@services/updates/collector/ICollectorService"
 import { Logger } from "@utils/utils"
-import ICollectorService from "./collector/ICollectorService"
 
-class PriceCollectorService implements IPriceCollectorService {
-  logger: Logger
+interface PriceCollectorService {
   collectorService: ICollectorService
-
-  constructor(service: CollectorService, logger: Logger) {
-    this.collectorService = new service()
-    this.logger = logger
-  }
+  logger: Logger
 }
 
 export default PriceCollectorService

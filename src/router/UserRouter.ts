@@ -8,10 +8,12 @@ class UserRouter extends BaseRouter {
 
   constructor() {
     super()
+
     const router = Router()
+
     this.userController = getDIInstance<UserController>("userController")
 
-    router.get("/user", this.userController.signIn)
+    router.post("/user", this.userController.signUp.bind(this.userController))
 
     this.addRouter(router)
   }

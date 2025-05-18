@@ -2,6 +2,7 @@ import { loggerFactory } from "@utils/utils"
 import { Request, Response, NextFunction } from "express"
 
 const logger = loggerFactory("http-log")
+const authLogger = loggerFactory("auth")
 
 function httpLogMiddleware(
   req: Request,
@@ -21,4 +22,9 @@ function httpLogMiddleware(
   next()
 }
 
-export { httpLogMiddleware }
+function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  authLogger.info(req.query.params)
+  next()
+}
+
+export { httpLogMiddleware, authMiddleware }

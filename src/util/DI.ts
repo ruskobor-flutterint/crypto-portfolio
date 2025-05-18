@@ -1,21 +1,25 @@
-import UserControllerImpl from "@controllers/UserControllerImpl"
-import PriceCollectorService from "@services/updates/PriceCollectorService"
-import PortfolioInstanceImpl from "@services/portfolio/PortfolioServiceImpl"
-import PortfolioService from "@services/portfolio/PortfolioServiceImpl"
 import { asClass, asFunction, asValue, createContainer } from "awilix"
-import { loggerFactoryV2 } from "./utils"
+import { MongoClient } from "mongodb"
+import { loggerFactoryV2, Logger, loggerFactory } from "@utils/utils"
 import PortfolioControllerImpl from "@controllers/PortfolioControllerImpl"
+import UserControllerImpl from "@controllers/UserControllerImpl"
+import { Config } from "src/config/config"
+import PortfolioRepository from "@services/persitance/repository/PortfolioMongoRepository"
+import UserRepository from "@services/persitance/repository/UserMongoRespository"
+import Repository from "@services/persitance/repository/Repository"
 import MongoStore from "@services/persitance/MongoStore"
 import Store from "@services/persitance/Store"
-import { MongoClient } from "mongodb"
-import { Config } from "src/config/config"
-import Repository from "@services/persitance/Repository/Repository"
-import { Logger } from "@utils/utils"
+import PortfolioServiceImpl from "@services/portfolio/PortfolioServiceImpl"
 import Portfolio from "@services/portfolio/models/Porfolio"
 import User from "@services/user/models/User"
-import UserRepository from "@services/persitance/Repository/UserMongoRespository"
-import PortfolioRepository from "@services/persitance/Repository/PortfolioMongoRepository"
-import PortfolioServiceImpl from "@services/portfolio/PortfolioServiceImpl"
+import PriceCollectorService from "@services/updates/PriceCollectorServiceImpl"
+import CoinPricingServiceImpl from "@services/pricing/CoinPricingServiceImpl"
+import CoinPricingService from "@services/pricing/CoinPricingService"
+import KafkaProducerFactory from "@services/updates/kafka/KafkaProducerFactory"
+import KakfaConsumerFactory from "@services/updates/kafka/KafkaConsumerFactory"
+import { Kafka } from "kafkajs"
+import UserServiceImpl from "@services/user/UserServiceImpl"
+import PriceCollectorServiceImpl from "@services/updates/PriceCollectorServiceImpl"
 
 // DI container
 const diContainer = createContainer({
@@ -25,6 +29,10 @@ const diContainer = createContainer({
 
 export const setupDI = (conf: Config) => {
   type StoreType = MongoClient
+  const kafkaConfig = {
+    clientId: conf.kafkaClientId,
+    brokers: [conf.kafkaBrokersUri],
+  }
 
   diContainer.register({
     // DB
@@ -76,25 +84,34 @@ export const setupDI = (conf: Config) => {
     userRepository: asClass(
       UserRepository as new ({
         dbUserCollection,
-        userRepositoryLogger,
+        dbService,
+        logger,
       }: {
         dbUserCollection: string
-        userRepositoryLogger: Logger
+        dbService: Store<StoreType>
+        logger: Logger
       }) => Repository<User>
-    ),
-    userRepositoryLogger: asFunction(loggerFactoryV2)
+    )
       .inject(() => ({
-        name: "userRepository",
-        options: {},
+        logger: loggerFactory("userRepository"),
       }))
       .singleton(),
-    //
 
-    collectorService: asClass(PriceCollectorService),
+    // userRepositoryLogger: asFunction(loggerFactoryV2)
+    //   .inject(() => ({
+    //     name: "userRepository",
+    //     options: {},
+    //   }))
+    //   .singleton(),
+
+    collectorService: asClass(PriceCollectorServiceImpl),
 
     // Controllers
-    userController: asClass(UserControllerImpl),
-    portfolioController: asClass(PortfolioControllerImpl),
+    userController: asClass(UserControllerImpl).inject(() => ({
+      logger: loggerFactory("userController", {}),
+    })),
+
+    portfolioController: asClass(PortfolioControllerImpl).singleton(),
 
     // Services - Portfolio
     portfolioService: asClass(PortfolioServiceImpl).singleton(),
@@ -102,6 +119,53 @@ export const setupDI = (conf: Config) => {
       .inject(() => ({
         name: "portfolioService",
         options: {},
+      }))
+      .singleton(),
+
+    // Services - User
+    userService: asClass(UserServiceImpl)
+      .inject(() => ({
+        logger: loggerFactory("userService", {}),
+      }))
+      .singleton(),
+
+    // Services - Coin Pricing
+    coinPricingService: asClass(
+      CoinPricingServiceImpl as new ({
+        coinPricingServiceLogger,
+      }: {
+        coinPricingServiceLogger: Logger
+      }) => CoinPricingService
+    ).singleton(),
+    coinPricingServiceLogger: asFunction(loggerFactoryV2)
+      .inject(() => ({
+        name: "coinPricingService",
+        options: {},
+      }))
+      .singleton(),
+
+    //
+    kafkaService: asValue(
+      new Kafka({
+        clientId: conf.kafkaClientId,
+        brokers: [conf.kafkaBrokersUri],
+      })
+    ),
+
+    // Services - KafkaProducer - PortfolioUpdates
+    portfolioUpdatesProducer: asClass(KafkaProducerFactory<Portfolio>)
+      .inject(() => ({
+        topic: conf.kafkaPortfolioUpdatesTopic,
+        logger: loggerFactory(`portfolioUpdatesProducer`, {}),
+      }))
+      .singleton(),
+
+    // Services - KafkaConsumer - PortfolioUpdates
+    portfolioUpdatesConsumer: asClass(KakfaConsumerFactory<Portfolio>)
+      .inject(() => ({
+        topic: conf.kafkaPortfolioUpdatesTopic,
+        groupId: conf.kafkaPortfolioUpdatesConsumerGroupId,
+        logger: loggerFactory(`portfolioUpdatesConsumer`, {}),
       }))
       .singleton(),
   })

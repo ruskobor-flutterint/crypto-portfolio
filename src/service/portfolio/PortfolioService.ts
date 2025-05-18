@@ -2,7 +2,7 @@ import User from "@services/user/models/User"
 import Portfolio from "./models/Porfolio"
 
 interface PortfolioService {
-  updatePorfolio(user: User, portfolio: Portfolio): Promise<boolean>
+  updatePortfolio(user: User, portfolio: Portfolio): Promise<boolean>
   getPortfolio(user: User): Promise<Portfolio | null>
 }
 

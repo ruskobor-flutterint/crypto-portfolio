@@ -1,9 +1,9 @@
 import Portfolio from "@services/portfolio/models/Porfolio"
-import Repository from "./Repository"
+import Repository from "@services/persitance/repository/Repository"
 import { Logger } from "@utils/utils"
-import Store from "../Store"
-import { Collection, Filter, MongoClient, WithId, WithoutId } from "mongodb"
-import MongoStore from "../MongoStore"
+import Store from "@services/persitance/Store"
+import MongoStore from "@services/persitance/MongoStore"
+import { Collection, Filter, MongoClient, WithoutId } from "mongodb"
 
 class PortfolioMongoRepository implements Repository<Portfolio> {
   public collectionName: string
@@ -26,13 +26,18 @@ class PortfolioMongoRepository implements Repository<Portfolio> {
     this.collection = this.store.getDb().collection(this.collectionName)
   }
 
-  async find(query: WithoutId<Portfolio>): Promise<Portfolio | null> {
+  async find(
+    query: WithoutId<Portfolio>
+  ): Promise<WithoutId<Portfolio> | null> {
     try {
-      const portfolio = await this.collection.findOne(query)
+      const portfolio = await this.collection.findOne(query, {
+        projection: { _id: 0 },
+      })
       if (portfolio)
         this.logger.info(
-          `Successfully found ${query.user} portfolio:`,
-          portfolio
+          `Successfully found ${query.user}'s portfolio: ${JSON.stringify(
+            portfolio
+          )}`
         )
       return portfolio ? portfolio : null
     } catch (error) {
@@ -56,9 +61,19 @@ class PortfolioMongoRepository implements Repository<Portfolio> {
     }
   }
 
-  //
-  async create(item: Portfolio): Promise<Portfolio> {
-    throw new Error("Method not implemented.")
+  async create(item: Portfolio): Promise<boolean> {
+    try {
+      const portfolio = await this.collection.insertOne(item)
+      if (portfolio.acknowledged)
+        this.logger.info(`Portfolio ${JSON.stringify(item)} has been created.`)
+      return portfolio.acknowledged
+    } catch (error) {
+      this.logger.error(
+        `Portfolio ${JSON.stringify(item)} failed to create `,
+        error
+      )
+      return false
+    }
   }
 
   async delete(id: string): Promise<void> {

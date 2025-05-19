@@ -51,12 +51,19 @@ class PortfolioMongoRepository implements Repository<Portfolio> {
     update: WithoutId<Portfolio>
   ): Promise<boolean> {
     try {
-      const result = await this.collection.findOneAndReplace(query, update)
+      const result = await this.collection.findOneAndUpdate(query, {
+        $set: { assets: update.assets },
+      })
       if (result)
         this.logger.info(`Sucessfully updated ${query.user} portfolio `, update)
       return result ? true : false
     } catch (error) {
-      this.logger.error(`Portfolio ${query} update ${update} failed, `, error)
+      this.logger.error(
+        `Portfolio ${JSON.stringify(query)} update ${JSON.stringify(
+          update
+        )} failed, `,
+        error
+      )
       return false
     }
   }

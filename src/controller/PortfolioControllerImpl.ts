@@ -11,18 +11,19 @@ class PortfolioControllerImpl implements PortfolioController {
 
   constructor({
     portfolioService,
-    portfolioServiceLogger,
+    logger,
   }: {
     portfolioService: PortflioService
-    portfolioServiceLogger: Logger
+    logger: Logger
   }) {
     this.portfolioService = portfolioService
-    this.logger = portfolioServiceLogger
+    this.logger = logger
   }
 
   async getPortfolio(req: Request, res: Response): Promise<void> {
     try {
-      const user: User = { user: "Bob" }
+      const userString = req.header("X-Crypto-Portfolio-Token") as string
+      const user: User = { user: userString }
 
       const portfolio = await this.portfolioService.getPortfolio(user)
       portfolio
@@ -36,15 +37,12 @@ class PortfolioControllerImpl implements PortfolioController {
 
   async updatePortfolio(req: Request, res: Response): Promise<void> {
     try {
-      const user: User = { user: "Bob" }
-      const portfolio: Portfolio = {
-        user: user.user,
-        assets: [{ coin: "BTC", amount: 3 }],
-        lastUpdated: new Date().toISOString(),
-      }
+      const username = req.header("X-Crypto-Portfolio-Token") as string
+      const portfolio = req.body as Portfolio
+      const user: User = { user: username }
 
       if (await this.portfolioService.updatePortfolio(user, portfolio))
-        res.status(200).send({ status: "profile updated" })
+        res.status(200).send({ status: "portfolio updated" })
       else res.status(200).send({ status: "portfolio not updated" })
     } catch (error) {
       this.logger.error("Error in updatePortfolio:", error)

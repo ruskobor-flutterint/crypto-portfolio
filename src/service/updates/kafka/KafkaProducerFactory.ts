@@ -1,5 +1,5 @@
 import { Logger } from "@utils/utils"
-import { Kafka, Producer } from "kafkajs"
+import { Kafka, Message, Producer, ProducerBatch, TopicMessages } from "kafkajs"
 
 class KafkaProducerFactory<T> {
   private producer: Producer
@@ -54,7 +54,22 @@ class KafkaProducerFactory<T> {
       })
   }
 
-  public sendBatch(message: T[]) {}
+  async sendBatch(messages: T[]) {
+    const kafkaMessages: Message[] = messages.map((message: T) => {
+      return { value: JSON.stringify(message) }
+    })
+
+    const topicMessages: TopicMessages = {
+      topic: this.topic,
+      messages: kafkaMessages,
+    }
+
+    const batch: ProducerBatch = {
+      topicMessages: [topicMessages],
+    }
+
+    await this.producer.sendBatch(batch)
+  }
 
   public async shutdown(): Promise<void> {
     await this.producer.disconnect()

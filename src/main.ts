@@ -19,7 +19,3 @@ app.use(new PortfolioRouter().getRouter())
 app.listen(port, () => {
   appLog.info(`crypto-porfolio listening on port ${port}`)
 })
-
-// let ks = new KafkaService()
-// ks.connect()
-// ks.sendMessage("test-topic", "Hello KafkaJS user!")

@@ -2,7 +2,10 @@ import { Router } from "express"
 import BaseRouter from "./BaseRouter"
 import PortfolioController from "@controllers/PortfolioController"
 import { getDIInstance } from "@utils/DI"
-import { authMiddleware } from "@middlewares/Middleware"
+import {
+  authMiddleware,
+  sanitizePortfolioMiddleware,
+} from "@middlewares/Middleware"
 
 class PorfolioRouter extends BaseRouter {
   private portfolioController: PortfolioController
@@ -16,12 +19,14 @@ class PorfolioRouter extends BaseRouter {
 
     router.get(
       "/portfolio",
+      authMiddleware,
       this.portfolioController.getPortfolio.bind(this.portfolioController)
     )
 
     router.post(
       "/portfolio",
       authMiddleware,
+      sanitizePortfolioMiddleware,
       this.portfolioController.updatePortfolio.bind(this.portfolioController)
     )
 

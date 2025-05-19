@@ -12,14 +12,17 @@ import Store from "@services/persitance/Store"
 import PortfolioServiceImpl from "@services/portfolio/PortfolioServiceImpl"
 import Portfolio from "@services/portfolio/models/Porfolio"
 import User from "@services/user/models/User"
-import PriceCollectorService from "@services/updates/PriceCollectorServiceImpl"
 import CoinPricingServiceImpl from "@services/pricing/CoinPricingServiceImpl"
-import CoinPricingService from "@services/pricing/CoinPricingService"
+import CoinPricingService, {
+  CoinOffering,
+} from "@services/pricing/CoinPricingService"
 import KafkaProducerFactory from "@services/updates/kafka/KafkaProducerFactory"
 import KakfaConsumerFactory from "@services/updates/kafka/KafkaConsumerFactory"
 import { Kafka } from "kafkajs"
 import UserServiceImpl from "@services/user/UserServiceImpl"
-import PriceCollectorServiceImpl from "@services/updates/PriceCollectorServiceImpl"
+import CollectorService from "@services/updates/collector/CollectorService"
+import CoinMarketCapAPI from "@services/updates/collector/CoinMarketCapAPI"
+import PortfolioService from "@services/portfolio/PortfolioService"
 
 // DI container
 const diContainer = createContainer({
@@ -60,6 +63,30 @@ export const setupDI = (conf: Config) => {
       }))
       .singleton(),
 
+    // Services - CollectorService - CoinMarketApi
+    collectorService: asClass(
+      CoinMarketCapAPI as new ({
+        apiKey,
+        baseUrl,
+        logger,
+        intervalMs,
+        coinPriceUpdatesProducer,
+      }: {
+        apiKey: string
+        baseUrl: string
+        logger: Logger
+        intervalMs: number
+        coinPriceUpdatesProducer: KafkaProducerFactory<CoinOffering>
+      }) => CollectorService
+    )
+      .inject(() => ({
+        apiKey: conf.coinMarketCapApiKey,
+        baseUrl: conf.coinMarketCapBaseUrl,
+        logger: loggerFactory("coinMarketApi", {}),
+        intervalMs: conf.collectorServiceTimeoutMs,
+      }))
+      .singleton(),
+
     // Repositories - Portfolio
     portfolioRepository: asClass(
       PortfolioRepository as new ({
@@ -97,29 +124,35 @@ export const setupDI = (conf: Config) => {
       }))
       .singleton(),
 
-    // userRepositoryLogger: asFunction(loggerFactoryV2)
-    //   .inject(() => ({
-    //     name: "userRepository",
-    //     options: {},
-    //   }))
-    //   .singleton(),
+    // Controllers - User
+    userController: asClass(UserControllerImpl)
+      .inject(() => ({
+        logger: loggerFactory("userController", {}),
+      }))
+      .singleton(),
 
-    collectorService: asClass(PriceCollectorServiceImpl),
-
-    // Controllers
-    userController: asClass(UserControllerImpl).inject(() => ({
-      logger: loggerFactory("userController", {}),
-    })),
-
-    portfolioController: asClass(PortfolioControllerImpl).singleton(),
+    // Controllers - Portfolio
+    portfolioController: asClass(PortfolioControllerImpl)
+      .inject(() => ({ logger: loggerFactory("portfolioController", {}) }))
+      .singleton(),
 
     // Services - Portfolio
-    portfolioService: asClass(PortfolioServiceImpl).singleton(),
-    portfolioServiceLogger: asFunction(loggerFactoryV2)
-      .inject(() => ({
-        name: "portfolioService",
-        options: {},
-      }))
+    portfolioService: asClass(
+      PortfolioServiceImpl as new ({
+        portfolioRepository,
+        logger,
+        portfolioUpdatesProducer,
+        portfolioUpdatesConsumer,
+        coinPricingService,
+      }: {
+        portfolioRepository: Repository<Portfolio>
+        logger: Logger
+        portfolioUpdatesProducer: KafkaProducerFactory<Portfolio>
+        portfolioUpdatesConsumer: KakfaConsumerFactory<Portfolio>
+        coinPricingService: CoinPricingService
+      }) => PortfolioService
+    )
+      .inject(() => ({ logger: loggerFactory("portfolioService", {}) }))
       .singleton(),
 
     // Services - User
@@ -132,16 +165,14 @@ export const setupDI = (conf: Config) => {
     // Services - Coin Pricing
     coinPricingService: asClass(
       CoinPricingServiceImpl as new ({
-        coinPricingServiceLogger,
+        logger,
+        coinPriceUpdatesConsumer,
       }: {
-        coinPricingServiceLogger: Logger
+        logger: Logger
+        coinPriceUpdatesConsumer: KakfaConsumerFactory<CoinOffering>
       }) => CoinPricingService
-    ).singleton(),
-    coinPricingServiceLogger: asFunction(loggerFactoryV2)
-      .inject(() => ({
-        name: "coinPricingService",
-        options: {},
-      }))
+    )
+      .inject(() => ({ logger: loggerFactory("coinPricingService", {}) }))
       .singleton(),
 
     //
@@ -166,6 +197,23 @@ export const setupDI = (conf: Config) => {
         topic: conf.kafkaPortfolioUpdatesTopic,
         groupId: conf.kafkaPortfolioUpdatesConsumerGroupId,
         logger: loggerFactory(`portfolioUpdatesConsumer`, {}),
+      }))
+      .singleton(),
+
+    // Services - KafkaProducer - CoinPriceUpdates
+    coinPriceUpdatesProducer: asClass(KafkaProducerFactory<CoinOffering>)
+      .inject(() => ({
+        topic: conf.kafkaCoinPriceUpdatesTopic,
+        logger: loggerFactory(`coinPriceUpdatesProducer`, {}),
+      }))
+      .singleton(),
+
+    // Services - KafkaConsumer - CoinPriceUpdates
+    coinPriceUpdatesConsumer: asClass(KakfaConsumerFactory<CoinOffering>)
+      .inject(() => ({
+        topic: conf.kafkaCoinPriceUpdatesTopic,
+        groupId: conf.kafkaCoinPriceUpdatesTopic,
+        logger: loggerFactory(`coinPriceUpdatesConsumer`, {}),
       }))
       .singleton(),
   })

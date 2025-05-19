@@ -35,6 +35,7 @@ class UserServiceImpl implements UserService {
         lastUpdated: new Date().toISOString(),
       }
       await this.portfolioRepository.create(emptyPortfolio)
+      this.logger.info(`Created empty portfolio for user ${user}.`)
     }
 
     return userFound ? false : true

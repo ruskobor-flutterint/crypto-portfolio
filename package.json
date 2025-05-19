@@ -5,10 +5,9 @@
   "main": "src/main.ts",
   "type": "commonjs",
   "scripts": {
-    "start": "node dist/main.js | bunyan -o short",
-    "build": "rm -rf ./dits | tsc",
+    "start": "npx ts-node -r tsconfig-paths/register  ./src/main.ts",
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn src/main.ts | bunyan -o short",
-    "compose": "docker compose -f ./docker/compose.yaml -p 'crypto-portfolio-compose' up"
+    "compose": "docker compose -f ./docker/compose.yaml -p 'crypto-portfolio-compose' up --build"
   },
   "author": "Boris Ruskov",
   "license": "ISC",

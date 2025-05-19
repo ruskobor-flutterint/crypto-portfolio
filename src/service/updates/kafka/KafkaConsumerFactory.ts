@@ -46,9 +46,9 @@ class KakfaConsumerFactory<T> {
           const { topic, partition, message } = messagePayload
 
           const msgObj = JSON.parse(message.value?.toString() as string)
-          this.logger.info(`Message from ${topic}/${partition}/ ->`, msgObj)
+          this.logger.info(`Message from ${topic}/${partition} ->`, msgObj)
 
-          await consumerFunc(message as T)
+          await consumerFunc(msgObj as T)
         },
       })
     } catch (error) {

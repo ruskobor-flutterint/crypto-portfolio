@@ -1,33 +1,43 @@
 import User from "@services/user/models/User"
-import Portfolio from "./models/Porfolio"
+import Portfolio, { UsdEvaluatedPortfolio } from "./models/Porfolio"
 import PortfolioService from "./PortfolioService"
 import Repository from "@services/persitance/repository/Repository"
 import { Logger } from "@utils/utils"
 import KafkaProducerFactory from "@services/updates/kafka/KafkaProducerFactory"
 import KakfaConsumerFactory from "@services/updates/kafka/KafkaConsumerFactory"
+import CoinPricingService from "@services/pricing/CoinPricingService"
+import { CryptoAsset } from "@services/portfolio/models/Porfolio"
 
 class PortfolioServiceImpl implements PortfolioService {
-  portfolioRepository: Repository<Portfolio>
-  portfolioUpdatesProducer: KafkaProducerFactory<Portfolio>
-  portfolioUpdatesConsumer: KakfaConsumerFactory<Portfolio>
-  logger: Logger
+  private portfolioRepository: Repository<Portfolio>
+  private portfolioUpdatesProducer: KafkaProducerFactory<Portfolio>
+  private portfolioUpdatesConsumer: KakfaConsumerFactory<Portfolio>
+  private logger: Logger
+  private coinPricingService: CoinPricingService
 
   constructor({
     portfolioRepository,
-    portfolioServiceLogger,
+    logger,
     portfolioUpdatesProducer,
     portfolioUpdatesConsumer,
+    coinPricingService,
   }: {
     portfolioRepository: Repository<Portfolio>
-    portfolioServiceLogger: Logger
+    logger: Logger
     portfolioUpdatesProducer: KafkaProducerFactory<Portfolio>
     portfolioUpdatesConsumer: KakfaConsumerFactory<Portfolio>
+    coinPricingService: CoinPricingService
   }) {
     this.portfolioRepository = portfolioRepository
     this.portfolioUpdatesProducer = portfolioUpdatesProducer
     this.portfolioUpdatesConsumer = portfolioUpdatesConsumer
+    this.coinPricingService = coinPricingService
     this.portfolioUpdatesConsumer.start(this.consumePortfolioUpdate.bind(this))
-    this.logger = portfolioServiceLogger
+    this.logger = logger
+  }
+
+  producePortfolioUpdate(): Promise<void> {
+    throw new Error("Method not implemented.")
   }
 
   async consumePortfolioUpdate(porfolio: Portfolio) {
@@ -46,15 +56,41 @@ class PortfolioServiceImpl implements PortfolioService {
     this.portfolioUpdatesProducer.sendMessage(portfolio)
   }
 
-  async getPortfolio(user: User): Promise<Portfolio | null> {
-    this.logger.info(`Kato cqlo probvam tuka updeita po kafka ->`)
-    this.portfolioUpdatesProducer.sendMessage({
-      user: "test",
-      assets: [],
-      lastUpdated: "",
+  async getPortfolio(user: User): Promise<UsdEvaluatedPortfolio | null> {
+    const porfolio = await this.portfolioRepository.find(user)
+    if (porfolio) {
+      return this.getUsdEvaluatedPortfolio(porfolio)
+    }
+    return null
+  }
+
+  getUsdEvaluatedPortfolio(portfolio: Portfolio): UsdEvaluatedPortfolio {
+    this.logger.info(`Evaluating ${portfolio.user}'s portfolio.`)
+    const evaluatedPortfolio: UsdEvaluatedPortfolio = {
+      portfolio: portfolio,
+      evaluation: {
+        assets: [],
+        totalUsd: 0,
+        evaluatedTs: new Date().toISOString(),
+      },
+    }
+
+    portfolio.assets.forEach((asset: CryptoAsset) => {
+      const coinPrice = this.coinPricingService.getCoinPrice(asset.coin)
+
+      // If it exists in our coinPriceService/cache
+      if (coinPrice !== null) {
+        const coinUsdAmount = asset.amount * coinPrice
+        evaluatedPortfolio.evaluation.assets.push({
+          coin: asset.coin,
+          amountInUsd: coinUsdAmount,
+        })
+
+        evaluatedPortfolio.evaluation.totalUsd += coinUsdAmount
+      }
     })
 
-    return this.portfolioRepository.find(user)
+    return evaluatedPortfolio
   }
 }
 
